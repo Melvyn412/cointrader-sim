@@ -1,0 +1,584 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulated Trading Game</title>
+  <style>
+    body { background-color: #f0f4f8; }
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1rem; }
+    input, button { padding: 0.5rem; margin: 0.25rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    td, th { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    #feed {
+       max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem; margin-top: 1rem; }
+  
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .wallet-update {
+      animation: pulse 0.4s ease-in-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); background-color: #d4edda; }
+      50% { transform: scale(1.05); background-color: #c3e6cb; }
+      100% { transform: scale(1); background-color: transparent; }
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    </style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body style="font-family: Arial, sans-serif; background: #f4f7fa; margin: 0; padding: 0;">
+  <div style="background: #222; color: white; padding: 1rem; text-align: center;">
+    <h1 style="margin: 0;">🪙 CoinTrader Sim</h1>
+    <p style="margin: 0.5rem 0 0;">Simulate trading fake shares in made-up companies with friends!</p><p id='playerInfo' style='margin-top:0.5rem; font-weight:bold;'></p>
+  </div>
+  <div style="max-width: 900px; margin: auto; padding: 1rem;">
+
+  <h1>Simulated Trading Game</h1>
+  <div id="login">
+    <input type="text" id="username" placeholder="Enter your name" />
+    <button onclick="login()">Start</button>
+  </div>
+
+  <div id="game" style="display:none;">
+    <p>Welcome, <span id="playerName"></span> | Wallet: <span id="wallet">1000</span> 🪙</p>
+    <table>
+      <thead><tr><th>Company</th><th>Price</th><th>Actions</th></tr></thead>
+      <tbody id="companyTable"></tbody>
+    </table>
+
+    <h3>Leaderboard</h3><div id="leaderboard"></div>
+<div style="margin-top: 10px;">
+  <label for="chartCompanies">Select companies:</label>
+  <select id="chartCompanies" multiple size="5" style="width:200px;"></select>
+  <br>
+  <label for="volatility">Volatility (1-20%):</label>
+  <input type="range" id="volatility" min="1" max="20" value="5" />
+  <span id="volDisplay">5%</span>
+  <br>
+  <button onclick="toggleChart()">Show/Hide Chart</button>
+</div>
+
+<canvas id="priceChart" width="400" height="150"></canvas><div id="feed"></div>
+    <input type="text" id="commentInput" placeholder="Post a tip or comment..." />
+    <button onclick="postComment()">Post</button>
+  </div>
+
+  <script>
+    let user = "";
+    let wallet = 1000;
+    const portfolio = {};
+    const prices = {
+      "ZenTech": 100,
+      "AetherWorks": 80,
+      "NovaCorp": 120,
+      "SkyLink": 95,
+      "QuantumForge": 150,
+      "LumaSoft": 70,
+      "NebulaDynamics": 130,
+      "OrionGroup": 60,
+      "PulseEnterprises": 110,
+      "StellarWave": 90,
+  "LunarTech": 75,
+  "SolarRise": 105,
+  "EchoChain": 89,
+  "CyberNest": 115,
+  "PlasmaCore": 140,
+  "HypernovaInc": 95,
+  "VertexLabs": 88,
+  "AstroWorks": 102,
+  "PhotonTech": 99
+    };
+    const feed = [];
+
+    function login() {
+      user = document.getElementById("username").value;
+      if (!user) return alert("Enter your name");
+      document.getElementById("playerName").textContent = user;
+      document.getElementById("login").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      renderCompanies(); updateChart();
+      updateWallet();
+    }
+
+    
+    function updateWallet() {
+      const walletElem = document.getElementById("wallet");
+      walletElem.textContent = wallet.toFixed(2);
+      walletElem.classList.add("wallet-update");
+      setTimeout(() => walletElem.classList.remove("wallet-update"), 400);
+      updateLeaderboard();
+    }
+
+    function updateLeaderboard() {
+      const value = Object.entries(portfolio).reduce((total, [company, shares]) => {
+        return total + (shares * prices[company]);
+      }, wallet);
+      document.getElementById("leaderboard").innerHTML = `<strong>${user}</strong>: ${value.toFixed(2)} 🪙`;
+    }
+    
+      
+    const walletElem = document.getElementById("wallet");
+    walletElem.textContent = wallet.toFixed(2);
+    walletElem.classList.add("wallet-update");
+    setTimeout(() => walletElem.classList.remove("wallet-update"), 400);
+    
+    }
+
+    
+    const previousPrices = {...prices}; // store last prices
+    function renderCompanies() {
+      const table = document.getElementById("companyTable");
+      table.innerHTML = "";
+      for (const [name, price] of Object.entries(prices)) {
+        const prev = previousPrices[name] || price;
+        const changeColor = price > prev ? 'green' : price < prev ? 'red' : 'black';
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${name}</td>
+          <td style="color:${changeColor}">${price}</td>
+          <td>
+            <button onclick="trade('${name}', 'buy')">Buy</button>
+            <button onclick="trade('${name}', 'sell')">Sell</button>
+          </td>
+        `;
+        table.appendChild(row);
+      }
+    }
+    
+      const table = document.getElementById("companyTable");
+      table.innerHTML = "";
+      for (const [name, price] of Object.entries(prices)) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${name}</td>
+          <td>${price}</td>
+          <td>
+            <button onclick="trade('${name}', 'buy')">Buy</button>
+            <button onclick="trade('${name}', 'sell')">Sell</button>
+          </td>
+        `;
+        table.appendChild(row);
+      }
+    }
+
+    function trade(company, type) {
+      const price = prices[company];
+      portfolio[company] = portfolio[company] || 0;
+
+      if (type === "buy" && wallet >= price) {
+        wallet -= price;
+        portfolio[company]++;
+        addFeed(`${user} bought 1 share of ${company}`);
+      } else if (type === "sell" && portfolio[company] > 0) {
+        wallet += price;
+        portfolio[company]--;
+        addFeed(`${user} sold 1 share of ${company}`);
+      } else {
+        alert("Invalid transaction.");
+      }
+      updateWallet();
+    }
+
+    function postComment() {
+      const input = document.getElementById("commentInput");
+      const text = input.value.trim();
+      if (text) {
+        addFeed(`${user} says: ${text}`);
+        input.value = "";
+      }
+    }
+
+    
+    function addFeed(message) {
+      let color = "green";
+      if (message.includes("sold")) color = "red";
+      else if (message.includes("says:")) color = "blue";
+      message = `<div class='fade-in' style='color:${color}'>${message}</div>`;
+
+      feed.unshift(message);
+      if (feed.length > 20) feed.pop();
+      document.getElementById("feed").innerHTML = feed.map(m => `<div>${m}</div>`).join("");
+    }
+  </script>
+<script>
+let priceHistory = {};
+let chart;
+function initChart() {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        y: { beginAtZero: false }
+      }
+    }
+  });
+}
+function updateChart() {
+  const timestamp = new Date().toLocaleTimeString();
+  chart.data.labels.push(timestamp);
+  if (chart.data.labels.length > 20) chart.data.labels.shift();
+
+  chart.data.datasets = Object.keys(prices).slice(0, 3).map((company, index) => {
+    if (!priceHistory[company]) priceHistory[company] = [];
+    priceHistory[company].push(prices[company]);
+    if (priceHistory[company].length > 20) priceHistory[company].shift();
+    return {
+      label: company,
+      data: priceHistory[company],
+      borderColor: ['#3e95cd', '#8e5ea2', '#3cba9f'][index % 3],
+      fill: false
+    };
+  });
+  chart.update();
+}
+function showOnboarding() {
+  document.getElementById('onboardingModal').style.display = 'block';
+}
+function closeOnboarding() {
+  document.getElementById('onboardingModal').style.display = 'none';
+}
+window.onload = () => {
+  loadProfile();
+  initChart();
+  setInterval(updateChart, 5000);
+  showOnboarding(); // show on first load
+};
+  setInterval(updateChart, 5000);
+};
+</script>
+<script>
+let priceHistory = {};
+let chart;
+let volatility = 5;
+
+function initChart() {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        y: { beginAtZero: false }
+      }
+    }
+  });
+  populateCompanyDropdown();
+}
+
+function populateCompanyDropdown() {
+  const select = document.getElementById("chartCompanies");
+  select.innerHTML = "";
+  Object.keys(prices).forEach(name => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  });
+}
+
+function updateChart() {
+  const timestamp = new Date().toLocaleTimeString();
+  chart.data.labels.push(timestamp);
+  if (chart.data.labels.length > 20) chart.data.labels.shift();
+
+  const selected = Array.from(document.getElementById("chartCompanies").selectedOptions).map(opt => opt.value);
+  chart.data.datasets = selected.map((company, index) => {
+    if (!priceHistory[company]) priceHistory[company] = [];
+    priceHistory[company].push(prices[company]);
+    if (priceHistory[company].length > 20) priceHistory[company].shift();
+    return {
+      label: company,
+      data: priceHistory[company],
+      borderColor: ['#3e95cd', '#8e5ea2', '#3cba9f', '#ff9933', '#3399ff'][index % 5],
+      fill: false
+    };
+  });
+  chart.update();
+}
+
+function toggleChart() {
+  const chartDiv = document.getElementById("priceChart").parentElement;
+  chartDiv.style.display = chartDiv.style.display === "none" ? "block" : "none";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("volatility").addEventListener("input", e => {
+    volatility = parseInt(e.target.value);
+    document.getElementById("volDisplay").textContent = volatility + "%";
+  });
+});
+</script>
+
+  </div>
+  
+<!-- Onboarding Modal -->
+<div id="onboardingModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.8); color:white; z-index:1000; padding:2rem; box-sizing:border-box;">
+  <div style="background:#333; padding:2rem; max-width:600px; margin:10% auto; border-radius:8px; position:relative;">
+    <h2>Welcome to CoinTrader Sim!</h2>
+    <ul>
+      <li>💰 Start with 1000 coins.</li>
+      <li>📈 Buy and sell shares in made-up companies.</li>
+      <li>📊 Watch share prices change every few seconds.</li>
+      <li>🎯 Try to grow your portfolio and top the leaderboard!</li>
+    </ul>
+    <button onclick="closeOnboarding()" style="margin-top:1rem;">Got it!</button>
+  </div>
+</div>
+
+<!-- Help Button -->
+<button onclick="showOnboarding()" style="position:fixed; bottom:20px; right:20px; padding:0.5rem 1rem; border:none;
+  background:#007bff; color:white; border-radius:5px; cursor:pointer; z-index:999;">❓ Help</button>
+
+
+<!-- Profile Modal -->
+<div id="profileModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.8); color:white; z-index:1000; padding:2rem; box-sizing:border-box;">
+  <div style="background:#333; padding:2rem; max-width:500px; margin:10% auto; border-radius:8px; position:relative;">
+    <h2>Customize Your Profile</h2>
+    <label>Display Name:</label><br>
+    <input type="text" id="playerName" placeholder="Your name" style="margin-bottom:1rem; width:100%;"><br>
+    <label>Choose Avatar:</label><br>
+    <select id="avatarSelect" style="margin-bottom:1rem; width:100%;">
+      <option value="🧙‍♂️">🧙‍♂️ Wizard</option>
+      <option value="👩‍💻">👩‍💻 Coder</option>
+      <option value="🧑‍🚀">🧑‍🚀 Astronaut</option>
+      <option value="🧟‍♀️">🧟‍♀️ Zombie</option>
+      <option value="🐉">🐉 Dragon</option>
+    </select><br>
+    <button onclick="saveProfile()">Save</button>
+  </div>
+</div>
+
+<!-- Edit Profile Button -->
+<button onclick="showProfileModal()" style="position:fixed; bottom:60px; right:20px; padding:0.5rem 1rem; border:none;
+  background:#28a745; color:white; border-radius:5px; cursor:pointer; z-index:999;">👤 Profile</button>
+
+<footer style="background: #222; color: white; text-align: center; padding: 1rem; margin-top: 2rem;">
+    <p style="margin: 0;">&copy; 2025 CoinTrader Sim — Built for fun, not real trading.</p>
+  </footer>
+<script>
+let currentPlayer = {
+  name: "Player",
+  avatar: "🧙‍♂️"
+};
+
+function showProfileModal() {
+  document.getElementById('profileModal').style.display = 'block';
+}
+function saveProfile() {
+  const name = document.getElementById("playerName").value.trim();
+  const avatar = document.getElementById("avatarSelect").value;
+  if (name) currentPlayer.name = name;
+  currentPlayer.avatar = avatar;
+  document.getElementById('profileModal').style.display = 'none';
+  localStorage.setItem("playerProfile", JSON.stringify(currentPlayer));
+  updatePlayerInfoDisplay();
+}
+function loadProfile() {
+  const saved = localStorage.getItem("playerProfile");
+  if (saved) {
+    currentPlayer = JSON.parse(saved);
+    updatePlayerInfoDisplay();
+  }
+}
+function updatePlayerInfoDisplay() {
+  document.getElementById("playerInfo").textContent = currentPlayer.avatar + " " + currentPlayer.name;
+}
+</script>
+
+<!-- Firebase SDKs -->
+<script type="module">
+  // Import Firebase modules (served via CDN)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, push, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Multiplayer sync logic
+
+  // Sync prices
+  function broadcastPrices(prices) {
+    set(ref(db, 'prices'), prices);
+  }
+  function listenForPrices(callback) {
+    onValue(ref(db, 'prices'), (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.val());
+      }
+    });
+  }
+
+  // Sync trades
+  function postTrade(trade) {
+    push(ref(db, 'trades'), trade);
+  }
+  function listenForTrades(callback) {
+    onValue(ref(db, 'trades'), (snapshot) => {
+      const trades = snapshot.val() || {};
+      callback(Object.values(trades));
+    });
+  }
+
+  // Sync leaderboard
+  function updateLeaderboard(playerId, playerData) {
+    update(ref(db, 'leaderboard/' + playerId), playerData);
+  }
+  function listenForLeaderboard(callback) {
+    onValue(ref(db, 'leaderboard'), (snapshot) => {
+      const data = snapshot.val() || {};
+      callback(data);
+    });
+  }
+
+  // Expose Firebase multiplayer functions
+  window.firebaseSync = {
+    broadcastPrices,
+    listenForPrices,
+    postTrade,
+    listenForTrades,
+    updateLeaderboard,
+    listenForLeaderboard
+  };
+</script>
+
+
+<!-- Chat UI -->
+<div style="position:fixed; bottom:0; left:0; width:100%; background:#111; padding:0.5rem; box-sizing:border-box; z-index:999;">
+  <form id="chatForm" onsubmit="sendChatMessage(); return false;" style="display:flex; gap:0.5rem;">
+    <input id="chatInput" type="text" placeholder="Say something..." style="flex:1; padding:0.4rem;">
+    <button type="submit">💬</button>
+  </form>
+  <div id="chatMessages" style="max-height:100px; overflow-y:auto; font-size:0.9rem; margin-top:0.5rem;"></div>
+</div>
+
+<script>
+// Extend existing buy/sell to sync with Firebase
+function broadcastTrade(action, company, shares, coins) {
+  const trade = {
+    player: currentPlayer.name,
+    avatar: currentPlayer.avatar,
+    action,
+    company,
+    shares,
+    coins,
+    time: new Date().toISOString()
+  };
+  firebaseSync.postTrade(trade);
+  firebaseSync.updateLeaderboard(currentPlayer.name, {
+    name: currentPlayer.name,
+    avatar: currentPlayer.avatar,
+    totalCoins: getPlayerCoins()
+  });
+}
+
+// Helper to get current coin balance (mocked for now)
+function getPlayerCoins() {
+  const balance = document.getElementById("coinBalance");
+  return balance ? parseFloat(balance.textContent) : 1000;
+}
+
+// Show trades in activity feed
+function showTradeFeed(trades) {
+  const feed = document.getElementById("activityFeed");
+  feed.innerHTML = "";
+  trades.reverse().forEach(trade => {
+    const el = document.createElement("div");
+    el.className = "activity-entry";
+    el.innerHTML = `<span style='color:lime;'>${trade.avatar} ${trade.player}</span> ${trade.action} ${trade.shares} in <strong>${trade.company}</strong> for ${trade.coins} coins`;
+    feed.appendChild(el);
+  });
+}
+
+// Show leaderboard
+function updateLeaderboardDisplay(data) {
+  const leaderboard = document.getElementById("leaderboardList");
+  leaderboard.innerHTML = "";
+  const sorted = Object.values(data).sort((a,b) => b.totalCoins - a.totalCoins);
+  sorted.forEach(player => {
+    const li = document.createElement("li");
+    li.textContent = `${player.avatar} ${player.name} – ${player.totalCoins} coins`;
+    leaderboard.appendChild(li);
+  });
+}
+
+// Start listening
+window.addEventListener("load", () => {
+  firebaseSync.listenForTrades(showTradeFeed);
+  firebaseSync.listenForLeaderboard(updateLeaderboardDisplay);
+});
+
+
+// Firebase chat
+function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const msg = {
+    player: currentPlayer.name,
+    avatar: currentPlayer.avatar,
+    text: input.value,
+    time: new Date().toISOString()
+  };
+  push(ref(db, 'chat'), msg);
+  input.value = "";
+}
+
+function listenForChatMessages() {
+  onValue(ref(db, 'chat'), (snapshot) => {
+    const chat = document.getElementById("chatMessages");
+    chat.innerHTML = "";
+    const messages = snapshot.val() || {};
+    Object.values(messages).slice(-10).forEach(msg => {
+      const div = document.createElement("div");
+      div.innerHTML = `<strong>${msg.avatar} ${msg.player}:</strong> ${msg.text}`;
+      chat.appendChild(div);
+    });
+  });
+}
+window.addEventListener("load", () => listenForChatMessages());
+</script>
+</body>
+
+</html>
