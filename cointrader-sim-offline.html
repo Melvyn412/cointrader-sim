@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CoinTrader Sim</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: white;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #1e1e1e;
+      padding: 1em;
+      text-align: center;
+      font-size: 1.5em;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      padding: 1em;
+    }
+    .profile {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .company {
+      background: #1e1e1e;
+      padding: 1em;
+      border-radius: 10px;
+      margin-bottom: 1em;
+    }
+    .leaderboard, .feed {
+      background: #1e1e1e;
+      padding: 1em;
+      border-radius: 10px;
+    }
+    .coin-change {
+      animation: pop 0.5s ease;
+    }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.3); color: gold; }
+      100% { transform: scale(1); }
+    }
+    canvas {
+      background: black;
+      height: 40px;
+    }
+    .btn {
+      background: gold;
+      border: none;
+      padding: 0.5em 1em;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .feed-entry {
+      color: #00ff00;
+    }
+  </style>
+</head>
+<body>
+  <header>💰 CoinTrader Sim</header>
+  <div class="container">
+    <div class="profile">
+      <div>
+        Logged in as <strong id="username">Guest</strong>
+        <button class="btn" onclick="logout()">Logout</button>
+      </div>
+      <div>Coins: <span id="coins">1000</span></div>
+    </div>
+
+    <div id="companies"></div>
+
+    <div class="leaderboard">
+      <h3>🏆 Leaderboard</h3>
+      <ol id="leaderboard"></ol>
+    </div>
+
+    <div class="feed">
+      <h3>📢 Activity Feed</h3>
+      <div id="feed"></div>
+    </div>
+
+    <div class="chat">
+      <h3>💬 Trade Tips</h3>
+      <input type="text" id="chatInput" placeholder="Share a tip..." />
+      <button class="btn" onclick="sendChat()">Send</button>
+      <div id="chatLog"></div>
+    </div>
+  </div>
+
+  <script>
+    let user = { name: "Guest", coins: 1000, trades: 0 };
+    let players = [user];
+    let companies = [
+      { name: "NeonTech", shares: 0, prices: [10] },
+      { name: "SynthCorp", shares: 0, prices: [8] },
+      { name: "MetaFarm", shares: 0, prices: [5] },
+      { name: "QuantumRail", shares: 0, prices: [12] },
+    ];
+
+    function logout() {
+      const name = prompt("Enter new username:");
+      if (name) {
+        user = { name, coins: 1000, trades: 0 };
+        players.push(user);
+        document.getElementById("username").textContent = name;
+        updateLeaderboard();
+        updateCoins();
+      }
+    }
+
+    function updateCoins() {
+      const coinsEl = document.getElementById("coins");
+      coinsEl.textContent = user.coins;
+      coinsEl.classList.add("coin-change");
+      setTimeout(() => coinsEl.classList.remove("coin-change"), 500);
+    }
+
+    function trade(companyIndex, amount) {
+      const company = companies[companyIndex];
+      const price = company.prices[company.prices.length - 1];
+      const total = price * amount;
+      if (user.coins >= total) {
+        user.coins -= total;
+        company.shares += amount;
+        user.trades += 1;
+        addFeed(`${user.name} bought ${amount} shares of ${company.name}`);
+        updateCoins();
+        updateLeaderboard();
+        drawCharts();
+      }
+    }
+
+    function addFeed(text) {
+      const el = document.createElement("div");
+      el.textContent = text;
+      el.className = "feed-entry";
+      document.getElementById("feed").prepend(el);
+    }
+
+    function updateLeaderboard() {
+      const lb = document.getElementById("leaderboard");
+      lb.innerHTML = "";
+      players.sort((a, b) => b.trades - a.trades);
+      players.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = `${p.name} - Trades: ${p.trades}`;
+        lb.appendChild(li);
+      });
+    }
+
+    function drawCharts() {
+      companies.forEach((company, idx) => {
+        const canvas = document.getElementById(`chart-${idx}`);
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = "lime";
+        ctx.beginPath();
+        company.prices.forEach((price, i) => {
+          const x = (i / company.prices.length) * canvas.width;
+          const y = canvas.height - (price * 2);
+          ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      });
+    }
+
+    function updateCompanies() {
+      const list = document.getElementById("companies");
+      list.innerHTML = "";
+      companies.forEach((company, idx) => {
+        const div = document.createElement("div");
+        div.className = "company";
+        const price = company.prices[company.prices.length - 1];
+        div.innerHTML = `
+          <h4>${company.name} - ${price} coins/share</h4>
+          <canvas width="200" height="40" id="chart-${idx}"></canvas>
+          <br/>
+          <button class="btn" onclick="trade(${idx}, 1)">Buy 1</button>
+          <button class="btn" onclick="trade(${idx}, 5)">Buy 5</button>
+        `;
+        list.appendChild(div);
+      });
+      drawCharts();
+    }
+
+    function simulatePriceChanges() {
+      companies.forEach(company => {
+        let last = company.prices[company.prices.length - 1];
+        let change = (Math.random() - 0.5) * 2;
+        let next = Math.max(1, last + change);
+        company.prices.push(parseFloat(next.toFixed(2)));
+        if (company.prices.length > 20) company.prices.shift();
+      });
+      updateCompanies();
+    }
+
+    function sendChat() {
+      const input = document.getElementById("chatInput");
+      const log = document.getElementById("chatLog");
+      if (input.value.trim()) {
+        const msg = document.createElement("div");
+        msg.textContent = `${user.name}: ${input.value}`;
+        log.prepend(msg);
+        input.value = "";
+      }
+    }
+
+    updateCompanies();
+    updateLeaderboard();
+    setInterval(simulatePriceChanges, 5000);
+  </script>
+</body>
+</html>
